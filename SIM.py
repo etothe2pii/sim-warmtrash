@@ -1,0 +1,373 @@
+#!/usr/bin/env python
+
+from argparse import ArgumentParser
+import math
+import sys
+
+class LossException(Exception):
+    pass
+
+class Shuffler:
+
+    def __init__(self, file:str) -> None:
+        try:
+            self.file = open(file)
+        except FileNotFoundError:
+            print("ERROR: Invalid file")
+            raise
+        except:
+            raise
+
+    #Get next number in Uniform(0,1)
+    def next(self) -> float:
+        try:
+            return float(self.file.readline())
+        except ValueError:
+            print("ERROR: Invalid line found in file")
+            raise
+        except:
+            raise
+
+
+    #Fisher-Yates in-place shuffling
+    def shuffle(self, deck:list):
+        c = 0
+        n = len(deck)
+        while c < n-1:
+
+            r = self.next()
+            p = math.floor(r*(n - c) + c)
+
+            #Swap Cards
+            card = deck[c]
+            deck[c] = deck[p]
+            deck[p] = card
+
+            c += 1
+
+    def close(self):
+        self.file.close()
+
+
+class War_Player:
+
+    def __init__(self, hand:list, shuffler:Shuffler) -> None:
+        self.hand:list = hand
+        self.winnings:list = []
+        self.shuffler:Shuffler = shuffler
+
+    def present_top(self) -> int:
+        if len(self.hand) == 0:
+            self.reshuffle()
+        return self.hand.pop(0)
+    
+    def reshuffle(self) -> None:
+        if len(self.winnings) == 0:
+            raise LossException
+        
+        self.shuffler.shuffle(self.winnings)
+        f = len(self.winnings)
+        self.hand = self.winnings
+        self.winnings = [] 
+    
+    def collect_winnings(self, winnings:list) -> None:
+        self.winnings += winnings
+
+    def get_score(self) -> int:
+        return len(self.winnings) + len(self.hand)
+
+    
+
+class War_Game:
+
+    def __init__(self, shuffler:Shuffler) -> None:
+        starting_deck:list = []
+        for i in range(13):
+            starting_deck += [i, i, i, i]
+
+        self.shuffler:Shuffler = shuffler
+
+        self.shuffler.shuffle(starting_deck)
+        self.turn:int = 0
+        self.transitions:int = 0
+        self.last_winner_transition:int = 0
+
+        self.winner = None
+
+        self.player_1 = War_Player(starting_deck[:26], self.shuffler)
+        self.player_2 = War_Player(starting_deck[26:], self.shuffler)
+
+    def play(self):
+        while True:
+
+
+            self.turn += 1
+            result = self.take_turn()
+            if result:
+                if result == self.player_1:
+                    if self.player_2.get_score() == 0:
+                        new_winner = self.player_1 if self.shuffler.next() > 0.5 else self.player_2
+                    else:
+                        self.player_2
+                if result == self.player_2:
+                    new_winner = self.player_1
+                
+            else:
+                new_winner = self.get_winner()
+
+            if self.winner is None:
+                self.winner = new_winner
+                self.transitions += 1
+                self.last_winner_transition = self.turn
+
+            elif self.winner != new_winner:
+                self.winner = new_winner
+                self.transitions += 1
+                self.last_winner_transition = self.turn
+
+            if self.player_1.get_score() == 0 or self.player_2.get_score() == 0:
+                return self.turn, self.transitions, self.last_winner_transition
+
+
+    def get_winner(self):
+        if self.player_1.get_score() == self.player_2.get_score():
+            return self.winner
+        
+        return self.player_1 if self.player_1.get_score() > self.player_2.get_score() else self.player_2
+
+    def take_turn(self):
+
+        winnings_pile = []
+        c1 = 0
+        c2 = 0
+
+        while c1 == c2:
+            
+            try:
+                c1 = self.player_1.present_top()
+            except LossException:
+                return self.player_1
+            except:
+                raise 
+
+            try:
+                c2 = self.player_2.present_top()
+            except LossException:
+                return self.player_2
+            except:
+                raise
+
+            winnings_pile += [c1, c2]
+
+
+        if c1 > c2:
+            self.player_1.collect_winnings(winnings_pile)
+
+        else:
+            self.player_2.collect_winnings(winnings_pile)
+
+
+        return None    
+
+
+
+class Trash:
+
+    def __init__(self, shuffler:Shuffler) -> None:
+        self.deck:list = []
+        for i in range(13):
+            self.deck += [i, i, i, i]
+
+        self.shuffler:Shuffler = shuffler
+
+        self.shuffler.shuffle(self.deck)
+
+        self.player_array = [[(self.deal(), False) for _ in range(10)] for i in range(2)]
+
+        self.discard = [self.deal()]
+
+        self.player_turn = 0
+
+        self.turn_number = 0
+        self.num_transitions = 0
+        self.last_transition = 0
+        self.last_winning_player = -1
+
+
+    def deal(self) -> int:
+        return self.deck.pop(0)
+    
+    def play(self):
+        while True:
+            self.turn_number += 1
+
+            try:
+                self.turn()
+            except LossException:
+                return self.turn_number, self.num_transitions, self.last_transition
+            except:
+                raise
+
+            new_winner = self.get_winner()
+
+            if new_winner != self.last_winning_player:
+                self.num_transitions += 1
+                self.last_transition = self.turn_number
+                self.last_winning_player = new_winner
+
+
+
+
+
+
+    def get_winner(self):
+        scores = []
+        for p in self.player_array:
+            score = 0
+            for c in p:
+                if not c[1]:
+                    score += 1
+            
+            score += len(c)*(len(c)+1)/2
+            scores.append(score)
+        if scores[0]==scores[1]:
+            return self.last_winning_player
+        if scores[0]>scores[1]:
+            return 0
+        return 1
+
+    def turn(self):
+
+        if len(self.deck) == 0:
+            self.deck = self.discard[:-1]
+            self.discard = [self.discard[-1]]
+            self.shuffler.shuffle(self.deck)
+
+        hand = None
+
+        self.trash(hand)
+
+
+        self.player_turn = (self.player_turn + 1)%2
+
+    def best_jacks(self) -> dict:
+        best = {}
+        
+        for i in range(10):
+            b = self.discard.count(i)
+            b += self.player_array[0].count((i, True))
+            b += self.player_array[1].count((i, True))
+
+            best[i] = b
+
+        return best
+    
+    def check_reshuffle(self):
+        finished = True
+        #check if all are face up
+        for c in self.player_array[self.player_turn]:
+            if not c[1]:
+                finished = False
+
+        if finished:
+            if len(self.player_array[self.player_turn]) == 1:
+                raise LossException
+            self.deck += self.discard + [n[0] for n in self.player_array[self.player_turn]]
+            prev_length = len(self.player_array[self.player_turn])
+            self.discard = []
+            self.player_array[self.player_turn] = []
+
+            self.shuffler.shuffle(self.deck)
+
+            self.player_array[self.player_turn] = [(self.deal(), False) for _ in range(prev_length - 1)]
+
+
+    def trash(self, hand):
+
+        self.check_reshuffle()
+
+        #Is my hand empty?
+        if hand is None:
+            d = self.discard[-1]
+            if d == 10:
+                hand = self.discard.pop(-1)
+                return self.trash(hand)
+            if d >= len(self.player_array[self.player_turn]):
+                hand = self.deal()
+                return self.trash(hand)
+            if not self.player_array[self.player_turn][d][1] or self.player_array[self.player_turn][d][0] == 10:
+                hand = self.discard.pop(-1)
+                return self.trash(hand)
+            if self.player_array[self.player_turn][d][0] == d:
+                hand = self.deal()
+                return self.trash(hand)
+        
+                
+            
+
+
+        #Check for Jack!
+        if hand == 10:
+            best = self.best_jacks()
+
+
+            b = 0
+            score = -1
+            for i in range(len(self.player_array[self.player_turn])):
+                if not self.player_array[self.player_turn][i][1]:
+                    
+                        if best[i] > score:
+                            b = i
+                            score = best[b]
+                
+            tmp = self.player_array[self.player_turn][b][0]
+            self.player_array[self.player_turn][b] = (hand, True)
+            hand = tmp
+
+
+            self.check_reshuffle()
+
+            return self.trash(hand)
+
+
+
+        if hand >= len(self.player_array[self.player_turn]):
+            self.check_reshuffle()
+            self.discard.append(hand)
+            return
+        if not self.player_array[self.player_turn][hand][1] or self.player_array[self.player_turn][hand][0] == 10:
+            tmp = self.player_array[self.player_turn][hand][0]
+            self.player_array[self.player_turn][hand] = (hand, True)
+            hand = tmp
+            self.check_reshuffle()
+            return self.trash(hand)
+        if self.player_array[self.player_turn][hand][0] == hand:
+            self.check_reshuffle()
+            self.discard.append(hand)
+            
+            return
+
+
+
+
+
+
+if __name__ == "__main__":
+
+    parser = ArgumentParser()
+    parser.add_argument("game")
+    parser.add_argument("file")
+
+    args = parser.parse_args()
+
+
+    if args.game == "war":
+        g = War_Game(Shuffler(args.file))
+    elif args.game == "trash":
+        g = Trash(Shuffler(args.file))
+    n,t,l = g.play()
+    print(f"OUTPUT {args.game} turns {n} transitions {t} last {l/n}")
+
+        
+        
+    sys.exit(0)

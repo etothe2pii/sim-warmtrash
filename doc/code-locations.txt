@@ -1,0 +1,3 @@
+All code in SIM
+Fisher-Yates - in class Shuffler in function shuffle, line 33
+Player Turn - in class Trash, in function turn (Although, most of the logic is represented in the recursive trash function), line 239
