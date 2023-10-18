@@ -88,7 +88,7 @@ class War_Game:
         self.shuffler:Shuffler = shuffler
 
         self.shuffler.shuffle(starting_deck)
-        self.turn:int = 0
+        self.turn:int = -1
         self.transitions:int = 0
         self.last_winner_transition:int = 0
 
@@ -174,29 +174,36 @@ class War_Game:
 class Trash:
 
     def __init__(self, shuffler:Shuffler) -> None:
+
+        #initialize deck, A = 0, J = 10
         self.deck:list = []
         for i in range(13):
             self.deck += [i, i, i, i]
 
+        #Initialize shuffler and shuffle the deck
         self.shuffler:Shuffler = shuffler
-
         self.shuffler.shuffle(self.deck)
 
+        #Get both initial player arrays
         self.player_array = [[(self.deal(), False) for _ in range(10)] for i in range(2)]
 
+        #Set up the discard with one card
         self.discard = [self.deal()]
 
+        #Start the game with the 1st player
         self.player_turn = 0
 
-        self.turn_number = 0
+        #set up counts
+        self.turn_number = -1
         self.num_transitions = 0
         self.last_transition = 0
         self.last_winning_player = -1
 
-
+    #Simple method to take a card from the deck
     def deal(self) -> int:
         return self.deck.pop(0)
     
+    #Method to begin play, accumulates statistics as well
     def play(self):
         while True:
             self.turn_number += 1
@@ -208,16 +215,13 @@ class Trash:
             except:
                 raise
 
+            #Figure out which player is winning, and update transitions based on this -- This is probably where the flaw is
             new_winner = self.get_winner()
 
             if new_winner != self.last_winning_player:
                 self.num_transitions += 1
                 self.last_transition = self.turn_number
                 self.last_winning_player = new_winner
-
-
-
-
 
 
     def get_winner(self):
@@ -227,12 +231,17 @@ class Trash:
             for c in p:
                 if not c[1]:
                     score += 1
-            
-            score += len(c)*(len(c)+1)/2
+            print(score)
+            #This was slightly wrong
+            score += ((len(p)-1)*(len(p)-2))/2
+            print(score, len(p))
             scores.append(score)
+        print(scores)
+        #I think I made the higher score the winner, it should have been the lower score!
+        #Maybe going into ties and out of ties should be counted as transitions ...
         if scores[0]==scores[1]:
             return self.last_winning_player
-        if scores[0]>scores[1]:
+        if scores[0]<scores[1]:
             return 0
         return 1
 
@@ -255,6 +264,7 @@ class Trash:
         
         for i in range(10):
             b = self.discard.count(i)
+
             b += self.player_array[0].count((i, True))
             b += self.player_array[1].count((i, True))
 
@@ -302,15 +312,9 @@ class Trash:
                 hand = self.deal()
                 return self.trash(hand)
         
-                
-            
-
-
         #Check for Jack!
         if hand == 10:
             best = self.best_jacks()
-
-
             b = 0
             score = -1
             for i in range(len(self.player_array[self.player_turn])):
@@ -346,10 +350,6 @@ class Trash:
             self.discard.append(hand)
             
             return
-
-
-
-
 
 
 if __name__ == "__main__":
